@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản Lý Dữ Liệu | Nguyễn Hữu Phước</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#070b18; --glass:rgba(255,255,255,.07); --border:rgba(255,255,255,.14);
+    --text:#eef2ff; --muted:#9ba6c7; --primary:#3ecf8e; --accent:#6366f1;
+    --danger:#ff5c6c; --input:rgba(255,255,255,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Inter','Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
+  html,body{min-height:100%}
+  body{background:var(--bg);color:var(--text);overflow-x:hidden}
+
+  /* ===== NỀN ĐỘNG ===== */
+  .bg{position:fixed;inset:0;z-index:0;overflow:hidden;background:
+      linear-gradient(135deg,#070b18,#0d1530 50%,#07131f)}
+  .blob{position:absolute;border-radius:50%;filter:blur(80px);opacity:.55;will-change:transform}
+  .b1{width:520px;height:520px;background:#3ecf8e;top:-120px;left:-100px;animation:f1 18s ease-in-out infinite}
+  .b2{width:600px;height:600px;background:#6366f1;bottom:-180px;right:-120px;animation:f2 22s ease-in-out infinite}
+  .b3{width:420px;height:420px;background:#06b6d4;top:40%;left:55%;animation:f3 26s ease-in-out infinite;opacity:.35}
+  .b4{width:360px;height:360px;background:#a855f7;top:55%;left:-80px;animation:f2 30s ease-in-out infinite reverse;opacity:.3}
+  @keyframes f1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(160px,120px) scale(1.2)}}
+  @keyframes f2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-180px,-100px) scale(1.15)}}
+  @keyframes f3{0%,100%{transform:translate(0,0)}33%{transform:translate(-200px,80px)}66%{transform:translate(100px,-120px)}}
+  .grid{position:absolute;inset:0;background-image:
+      linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+      background-size:48px 48px;mask-image:radial-gradient(ellipse at center,#000 30%,transparent 75%);
+      -webkit-mask-image:radial-gradient(ellipse at center,#000 30%,transparent 75%);animation:gm 40s linear infinite}
+  @keyframes gm{to{background-position:48px 48px}}
+  canvas#particles{position:absolute;inset:0;width:100%;height:100%}
+
+  /* ===== KHUNG CHÍNH ===== */
+  .page{position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px 16px}
+  .shell{width:100%;max-width:960px;display:grid;grid-template-columns:1fr 440px;gap:0;
+    background:var(--glass);border:1px solid var(--border);border-radius:26px;overflow:hidden;
+    backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:0 30px 80px rgba(0,0,0,.5);
+    animation:rise .7s cubic-bezier(.2,.8,.2,1)}
+  @keyframes rise{from{opacity:0;transform:translateY(24px) scale(.98)}to{opacity:1;transform:none}}
+  .shell.single{max-width:720px;grid-template-columns:1fr}
+  .shell.single .hero{display:none}
+
+  .hero{padding:48px 40px;display:flex;flex-direction:column;justify-content:space-between;
+    background:linear-gradient(160deg,rgba(62,207,142,.18),rgba(99,102,241,.18));border-right:1px solid var(--border)}
+  .logo{display:flex;align-items:center;gap:12px;font-weight:800;font-size:18px;letter-spacing:.3px}
+  .logo i{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-style:normal;font-size:22px;
+    background:linear-gradient(135deg,var(--primary),var(--accent));box-shadow:0 8px 24px rgba(62,207,142,.35)}
+  .hero h1{font-size:34px;line-height:1.2;margin:34px 0 14px;font-weight:800}
+  .hero h1 span{background:linear-gradient(90deg,var(--primary),#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{color:var(--muted);line-height:1.65;font-size:15px}
+  .feats{list-style:none;margin-top:28px;display:grid;gap:12px}
+  .feats li{display:flex;gap:12px;align-items:center;font-size:14px;color:#d6dcf3}
+  .feats li b{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:rgba(255,255,255,.1);font-weight:400}
+  .hero small{color:var(--muted);font-size:12px;margin-top:30px;display:block}
+
+  .panel{padding:40px 36px}
+  .shell.single .panel{padding:36px 40px}
+  .panel h2{font-size:24px;font-weight:800;margin-bottom:6px}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:22px;line-height:1.5}
+
+  .status{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.08);color:var(--muted);margin-bottom:18px}
+  .dot{width:8px;height:8px;border-radius:50%;background:#888}
+  .status.ok{color:var(--primary)} .status.ok .dot{background:var(--primary);box-shadow:0 0 10px var(--primary)}
+  .status.err{color:var(--danger)} .status.err .dot{background:var(--danger)}
+
+  .tabs{display:flex;background:rgba(255,255,255,.07);border-radius:12px;padding:4px;margin-bottom:18px}
+  .tab{flex:1;padding:10px;border:0;background:transparent;color:var(--muted);font-weight:700;font-size:14px;border-radius:9px;cursor:pointer;transition:.25s}
+  .tab.active{background:linear-gradient(135deg,var(--primary),#2bb6a0);color:#05261a;box-shadow:0 6px 16px rgba(62,207,142,.3)}
+  .tabs.small .tab{font-size:13px;padding:8px}
+
+  .field{margin-bottom:14px}
+  label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600;letter-spacing:.2px}
+  .input-wrap{position:relative}
+  input[type=text],input[type=email],input[type=password],input[type=tel]{
+    width:100%;padding:13px 14px;border-radius:11px;border:1px solid var(--border);background:var(--input);
+    color:var(--text);font-size:15px;outline:none;transition:.2s}
+  input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(62,207,142,.22);background:rgba(255,255,255,.11)}
+  input::placeholder{color:#6d789a}
+  .eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px;padding:6px}
+
+  .btn{width:100%;padding:14px;border:0;border-radius:11px;font-size:15px;font-weight:800;cursor:pointer;
+    background:linear-gradient(135deg,var(--primary),#2bb6a0);color:#05261a;transition:.2s;box-shadow:0 10px 24px rgba(62,207,142,.28)}
+  .btn:hover{transform:translateY(-2px);filter:brightness(1.07)}
+  .btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+  .btn.ghost{background:rgba(255,255,255,.1);color:var(--text);box-shadow:none;width:auto;padding:9px 16px;font-size:13px}
+  .link{background:none;border:0;color:var(--primary);cursor:pointer;font-size:13px;font-weight:600;padding:0}
+  .link:hover{text-decoration:underline}
+  .row{display:flex;justify-content:space-between;align-items:center;margin:2px 0 16px}
+  .hint{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.55}
+  .hidden{display:none!important}
+
+  .userbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:20px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+  .who{display:flex;align-items:center;gap:12px;min-width:0}
+  .avatar{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,var(--primary),var(--accent));display:grid;place-items:center;font-weight:800;color:#fff;flex-shrink:0;font-size:18px}
+  .who b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .who small{color:var(--muted);font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .add{display:flex;gap:10px}
+  .add .btn{width:auto;padding:0 24px}
+  .count{font-size:12px;color:var(--muted);margin:22px 0 10px;text-transform:uppercase;letter-spacing:.8px;display:flex;justify-content:space-between}
+  ul.data{list-style:none;max-height:340px;overflow:auto;padding-right:4px}
+  ul.data li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 15px;margin-bottom:8px;
+    background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:12px;animation:in .3s ease}
+  ul.data li .txt{word-break:break-word;flex:1}
+  ul.data li .time{display:block;font-size:11px;color:var(--muted);margin-top:3px}
+  ul.data li button{background:none;border:0;color:var(--danger);cursor:pointer;font-size:16px;padding:5px 9px;border-radius:8px}
+  ul.data li button:hover{background:rgba(255,92,108,.16)}
+  ul.data li.empty{justify-content:center;color:var(--muted);border-style:dashed}
+  @keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;
+    background:rgba(20,26,52,.95);border:1px solid var(--border);padding:13px 20px;border-radius:12px;font-size:14px;
+    transition:.3s;max-width:92vw;z-index:50;box-shadow:0 12px 34px rgba(0,0,0,.5)}
+  #toast.show{opacity:1;transform:translateX(-50%)}
+  #toast.success{border-color:var(--primary)} #toast.error{border-color:var(--danger)}
+  footer{position:relative;z-index:1;text-align:center;color:var(--muted);font-size:12px;padding:0 0 22px}
+
+  @media(max-width:860px){
+    .shell{grid-template-columns:1fr}
+    .hero{display:none}
+    .panel,.shell.single .panel{padding:30px 22px}
+  }
+  @media(prefers-reduced-motion:reduce){.blob,.grid{animation:none}}
+</style>
+</head>
+<body>
+<div class="bg">
+  <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div>
+  <div class="grid"></div>
+  <canvas id="particles"></canvas>
+</div>
+
+<div class="page">
+  <div class="shell" id="shell">
+
+    <aside class="hero">
+      <div>
+        <div class="logo"><i>🚀</i> NHP Cloud</div>
+        <h1>Lưu trữ dữ liệu <span>an toàn &amp; riêng tư</span></h1>
+        <p>Mỗi tài khoản có kho dữ liệu riêng biệt, được bảo vệ bằng cơ chế bảo mật cấp hàng (Row Level Security) trên cơ sở dữ liệu.</p>
+        <ul class="feats">
+          <li><b>🔐</b> Đăng nhập bằng email hoặc số điện thoại</li>
+          <li><b>🛡️</b> Dữ liệu chỉ chủ tài khoản mới xem được</li>
+          <li><b>⚡</b> Đồng bộ tức thì trên mọi thiết bị</li>
+        </ul>
+      </div>
+      <small>Dự án by Nguyễn Hữu Phước</small>
+    </aside>
+
+    <main class="panel">
+      <div id="status" class="status"><span class="dot"></span><span id="statusText">Đang kết nối máy chủ...</span></div>
+
+      <!-- ===== ĐĂNG NHẬP / ĐĂNG KÝ ===== -->
+      <section id="authView">
+        <h2 id="authTitle">Chào mừng trở lại</h2>
+        <p class="sub" id="authSub">Đăng nhập để truy cập dữ liệu của bạn.</p>
+
+        <div class="tabs" id="modeTabs">
+          <button class="tab active" id="tabLogin" type="button">Đăng nhập</button>
+          <button class="tab" id="tabRegister" type="button">Đăng ký</button>
+        </div>
+        <div class="tabs small" id="methodTabs">
+          <button class="tab active" id="mEmail" type="button">📧 Email</button>
+          <button class="tab" id="mPhone" type="button">📱 Số điện thoại</button>
+        </div>
+
+        <form id="authForm" novalidate>
+          <div class="field hidden" id="nameField">
+            <label for="fullName">Họ và tên</label>
+            <input type="text" id="fullName" placeholder="Nguyễn Văn A" autocomplete="name">
+          </div>
+          <div class="field" id="emailField">
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="ban@example.com" autocomplete="email">
+          </div>
+          <div class="field hidden" id="phoneField">
+            <label for="phone">Số điện thoại</label>
+            <input type="tel" id="phone" placeholder="0912345678 hoặc +84912345678" autocomplete="tel">
+          </div>
+          <div class="field">
+            <label for="password">Mật khẩu</label>
+            <div class="input-wrap">
+              <input type="password" id="password" placeholder="Ít nhất 6 ký tự" autocomplete="current-password">
+              <button type="button" class="eye" data-eye="password" aria-label="Hiện/ẩn mật khẩu">👁</button>
+            </div>
+          </div>
+          <div class="field hidden" id="confirmField">
+            <label for="confirm">Nhập lại mật khẩu</label>
+            <input type="password" id="confirm" placeholder="Nhập lại mật khẩu" autocomplete="new-password">
+          </div>
+          <div class="row" id="forgotRow">
+            <span></span>
+            <button class="link" type="button" id="forgotLink">Quên mật khẩu?</button>
+          </div>
+          <button class="btn" id="submitBtn" type="submit">Đăng nhập</button>
+          <p class="hint hidden" id="regHint"></p>
+        </form>
+      </section>
+
+      <!-- ===== NHẬP MÃ OTP ===== -->
+      <section id="otpView" class="hidden">
+        <h2>Nhập mã xác nhận</h2>
+        <p class="sub" id="otpSub">Mã gồm 6 số đã được gửi cho bạn.</p>
+        <form id="otpForm" novalidate>
+          <div class="field">
+            <label for="otp">Mã OTP</label>
+            <input type="text" id="otp" inputmode="numeric" maxlength="8" placeholder="123456" autocomplete="one-time-code">
+          </div>
+          <button class="btn" id="otpBtn" type="submit">Xác nhận</button>
+          <div class="row" style="margin-top:14px">
+            <button class="link" type="button" id="otpBack">← Quay lại</button>
+            <button class="link" type="button" id="otpResend">Gửi lại mã</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ===== QUÊN MẬT KHẨU ===== -->
+      <section id="forgotView" class="hidden">
+        <h2>Quên mật khẩu</h2>
+        <p class="sub">Chọn cách nhận hướng dẫn đặt lại mật khẩu.</p>
+        <div class="tabs small">
+          <button class="tab active" id="fEmailTab" type="button">📧 Email</button>
+          <button class="tab" id="fPhoneTab" type="button">📱 Số điện thoại</button>
+        </div>
+        <form id="forgotForm" novalidate>
+          <div class="field" id="fEmailField">
+            <label for="fEmail">Email đã đăng ký</label>
+            <input type="email" id="fEmail" placeholder="ban@example.com" autocomplete="email">
+          </div>
+          <div class="field hidden" id="fPhoneField">
+            <label for="fPhone">Số điện thoại đã đăng ký</label>
+            <input type="tel" id="fPhone" placeholder="0912345678" autocomplete="tel">
+          </div>
+          <button class="btn" id="forgotBtn" type="submit">Gửi yêu cầu</button>
+          <div class="row" style="margin-top:14px">
+            <button class="link" type="button" id="forgotBack">← Quay lại đăng nhập</button>
+            <span></span>
+          </div>
+        </form>
+      </section>
+
+      <!-- ===== ĐẶT MẬT KHẨU MỚI ===== -->
+      <section id="resetView" class="hidden">
+        <h2>Đặt mật khẩu mới</h2>
+        <p class="sub">Nhập mật khẩu mới cho tài khoản của bạn.</p>
+        <form id="resetForm" novalidate>
+          <div class="field">
+            <label for="newPass">Mật khẩu mới</label>
+            <div class="input-wrap">
+              <input type="password" id="newPass" placeholder="Ít nhất 6 ký tự" autocomplete="new-password">
+              <button type="button" class="eye" data-eye="newPass" aria-label="Hiện/ẩn mật khẩu">👁</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="newPass2">Nhập lại mật khẩu mới</label>
+            <input type="password" id="newPass2" placeholder="Nhập lại" autocomplete="new-password">
+          </div>
+          <button class="btn" id="resetBtn" type="submit">Cập nhật mật khẩu</button>
+        </form>
+      </section>
+
+      <!-- ===== KHU VỰC DỮ LIỆU ===== -->
+      <section id="appView" class="hidden">
+        <div class="userbar">
+          <div class="who">
+            <div class="avatar" id="avatar">?</div>
+            <div><b id="userName">—</b><small id="userContact">—</small></div>
+          </div>
+          <button class="btn ghost" id="logoutBtn" type="button">Đăng xuất</button>
+        </div>
+
+        <label for="dataInput">Nhập nội dung cần lưu trữ</label>
+        <div class="add">
+          <input type="text" id="dataInput" placeholder="Nhập ghi chú hoặc thông tin bất kỳ..." maxlength="500">
+          <button class="btn" id="addBtn" type="button">Gửi</button>
+        </div>
+
+        <div class="count"><span>Dữ liệu của riêng bạn</span><span id="countText">0 mục</span></div>
+        <ul class="data" id="dataList"></ul>
+      </section>
+    </main>
+  </div>
+</div>
+<footer>© Nguyễn Hữu Phước · Powered by Nguyen Huu Phuoc</footer>
+<div id="toast"></div>
+
+<script>
+  // ====== CẤU HÌNH SUPABASE ======
+  const supabaseUrl = 'https://shpgeimrysxupveqibyh.supabase.co';
+  const supabaseKey = 'sb_publishable_MUSk9i-KqoD2axABqY3DrA_pBYgkmd_';
+  const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+  const $ = id => document.getElementById(id);
+  const VIEWS = ['authView','otpView','forgotView','resetView','appView'];
+  let mode = 'login', method = 'email', fMethod = 'email';
+  let currentUser = null;
+  let otpContext = null;          // {type:'signup'|'recovery', phone|email}
+  let recoveryMode = false;
+
+  // ====== TIỆN ÍCH ======
+  let toastTimer;
+  function toast(msg, type='success'){
+    const t=$('toast'); t.textContent=msg; t.className='show '+type;
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.className='',3600);
+  }
+  function setStatus(ok,text){ $('status').className='status '+(ok?'ok':'err'); $('statusText').textContent=text; }
+  function show(view){
+    VIEWS.forEach(v=>$(v).classList.toggle('hidden',v!==view));
+    $('shell').classList.toggle('single',view==='appView');
+    $('status').classList.toggle('hidden',view==='appView');
+  }
+  function normPhone(p){
+    p=(p||'').replace(/[\s.\-()]/g,'');
+    if(p.startsWith('+')) return p;
+    if(p.startsWith('00')) return '+'+p.slice(2);
+    if(p.startsWith('0')) return '+84'+p.slice(1);   // mặc định Việt Nam
+    return '+'+p;
+  }
+  const validPhone = p => /^\+\d{9,15}$/.test(p);
+  const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+  function translateError(msg=''){
+    const m=msg.toLowerCase();
+    if(m.includes('invalid login')) return 'Tài khoản hoặc mật khẩu không đúng.';
+    if(m.includes('already registered')||m.includes('already been registered')) return 'Tài khoản này đã được đăng ký.';
+    if(m.includes('not confirmed')) return 'Tài khoản chưa được xác nhận.';
+    if(m.includes('password should be')) return 'Mật khẩu quá yếu (tối thiểu 6 ký tự).';
+    if(m.includes('same as the old')) return 'Mật khẩu mới phải khác mật khẩu cũ.';
+    if(m.includes('rate limit')||m.includes('too many')||m.includes('security purposes'))
+      return 'Máy chủ đang giới hạn số lần gửi yêu cầu. Vui lòng đợi ít phút rồi thử lại.';
+    if(m.includes('token has expired')||m.includes('invalid')&&m.includes('otp')) return 'Mã OTP sai hoặc đã hết hạn.';
+    if(m.includes('provider')&&m.includes('disabled')) return 'Máy chủ chưa bật tính năng này (xem hướng dẫn cấu hình Supabase).';
+    if(m.includes('sms')||m.includes('twilio')) return 'Máy chủ chưa cấu hình gửi SMS (xem hướng dẫn cấu hình Supabase).';
+    if(m.includes('failed to fetch')) return 'Mất kết nối mạng, vui lòng thử lại.';
+    return msg;
+  }
+  // Khóa nút trong lúc xử lý + chống bấm liên tục
+  async function busy(btn, label, fn){
+    if(btn.disabled) return;
+    const old=btn.textContent; btn.disabled=true; btn.textContent=label;
+    try{ await fn(); }
+    catch(err){ toast(translateError(err.message||String(err)),'error'); }
+    finally{ btn.disabled=false; btn.textContent=old; }
+  }
+  document.querySelectorAll('[data-eye]').forEach(b=>b.onclick=()=>{
+    const i=$(b.dataset.eye); i.type=i.type==='password'?'text':'password';
+  });
+
+  // ====== ĐĂNG NHẬP / ĐĂNG KÝ UI ======
+  function refreshAuthUI(){
+    const reg=mode==='register', phone=method==='phone';
+    $('tabLogin').classList.toggle('active',!reg);
+    $('tabRegister').classList.toggle('active',reg);
+    $('mEmail').classList.toggle('active',!phone);
+    $('mPhone').classList.toggle('active',phone);
+    $('emailField').classList.toggle('hidden',phone);
+    $('phoneField').classList.toggle('hidden',!phone);
+    $('nameField').classList.toggle('hidden',!reg);
+    $('confirmField').classList.toggle('hidden',!reg);
+    $('forgotRow').classList.toggle('hidden',reg);
+    $('regHint').classList.toggle('hidden',!reg);
+    $('regHint').textContent = phone
+      ? 'Mã OTP sẽ được gửi qua SMS để xác nhận số điện thoại của bạn.'
+      : 'Nếu máy chủ bật xác nhận email, hãy kiểm tra hộp thư để kích hoạt tài khoản.';
+    $('submitBtn').textContent = reg?'Tạo tài khoản':'Đăng nhập';
+    $('authTitle').textContent = reg?'Tạo tài khoản mới':'Chào mừng trở lại';
+    $('authSub').textContent = reg?'Chỉ mất vài giây để bắt đầu.':'Đăng nhập để truy cập dữ liệu của bạn.';
+    $('password').autocomplete = reg?'new-password':'current-password';
+  }
+  $('tabLogin').onclick=()=>{mode='login';refreshAuthUI()};
+  $('tabRegister').onclick=()=>{mode='register';refreshAuthUI()};
+  $('mEmail').onclick=()=>{method='email';refreshAuthUI()};
+  $('mPhone').onclick=()=>{method='phone';refreshAuthUI()};
+
+  $('authForm').addEventListener('submit',e=>{
+    e.preventDefault();
+    busy($('submitBtn'),'Đang xử lý...',async()=>{
+      const password=$('password').value;
+      let id;
+      if(method==='email'){
+        id=$('email').value.trim();
+        if(!validEmail(id)) throw new Error('Email không hợp lệ.');
+      }else{
+        id=normPhone($('phone').value);
+        if(!validPhone(id)) throw new Error('Số điện thoại không hợp lệ.');
+      }
+      if(password.length<6) throw new Error('Mật khẩu phải có ít nhất 6 ký tự.');
+      const cred = method==='email'?{email:id}:{phone:id};
+
+      if(mode==='register'){
+        const fullName=$('fullName').value.trim();
+        if(!fullName) throw new Error('Vui lòng nhập họ và tên.');
+        if(password!==$('confirm').value) throw new Error('Mật khẩu nhập lại không khớp.');
+        const {data,error}=await _supabase.auth.signUp({...cred,password,options:{data:{full_name:fullName}}});
+        if(error) throw error;
+        if(data.session){ toast('Đăng ký thành công! 🎉'); return; }
+        if(method==='phone'){
+          otpContext={type:'sms',phone:id};
+          $('otpSub').textContent='Mã OTP đã gửi tới '+id+'.';
+          $('otp').value=''; show('otpView');
+          toast('Đã gửi mã OTP qua SMS.');
+        }else{
+          toast('Đăng ký thành công! Hãy kiểm tra email để xác nhận tài khoản.');
+          mode='login'; refreshAuthUI();
+        }
+      }else{
+        const {error}=await _supabase.auth.signInWithPassword({...cred,password});
+        if(error) throw error;
+        toast('Đăng nhập thành công!');
+      }
+    });
+  });
+
+  // ====== OTP ======
+  $('otpForm').addEventListener('submit',e=>{
+    e.preventDefault();
+    busy($('otpBtn'),'Đang xác nhận...',async()=>{
+      const token=$('otp').value.trim();
+      if(token.length<4) throw new Error('Vui lòng nhập mã OTP.');
+      const {error}=await _supabase.auth.verifyOtp({phone:otpContext.phone,token,type:otpContext.type});
+      if(error) throw error;
+      if(otpContext.purpose==='recovery'){ recoveryMode=true; show('resetView'); toast('Xác minh thành công, hãy đặt mật khẩu mới.'); }
+      else toast('Xác nhận thành công! 🎉');
+    });
+  });
+  $('otpBack').onclick=()=>show(otpContext?.purpose==='recovery'?'forgotView':'authView');
+  $('otpResend').onclick=()=>busy($('otpResend'),'Đang gửi...',async()=>{
+    if(otpContext.purpose==='recovery'){
+      const {error}=await _supabase.auth.signInWithOtp({phone:otpContext.phone,options:{shouldCreateUser:false}});
+      if(error) throw error;
+    }else{
+      const {error}=await _supabase.auth.resend({type:'sms',phone:otpContext.phone});
+      if(error) throw error;
+    }
+    toast('Đã gửi lại mã OTP.');
+  });
+
+  // ====== QUÊN MẬT KHẨU ======
+  $('forgotLink').onclick=()=>show('forgotView');
+  $('forgotBack').onclick=()=>show('authView');
+  $('fEmailTab').onclick=()=>{fMethod='email';$('fEmailTab').classList.add('active');$('fPhoneTab').classList.remove('active');$('fEmailField').classList.remove('hidden');$('fPhoneField').classList.add('hidden')};
+  $('fPhoneTab').onclick=()=>{fMethod='phone';$('fPhoneTab').classList.add('active');$('fEmailTab').classList.remove('active');$('fPhoneField').classList.remove('hidden');$('fEmailField').classList.add('hidden')};
+
+  $('forgotForm').addEventListener('submit',e=>{
+    e.preventDefault();
+    busy($('forgotBtn'),'Đang gửi...',async()=>{
+      if(fMethod==='email'){
+        const email=$('fEmail').value.trim();
+        if(!validEmail(email)) throw new Error('Email không hợp lệ.');
+        const {error}=await _supabase.auth.resetPasswordForEmail(email,{redirectTo:location.href.split('#')[0]});
+        if(error) throw error;
+        toast('Nếu email tồn tại, liên kết đặt lại mật khẩu đã được gửi. Hãy kiểm tra hộp thư.');
+      }else{
+        const phone=normPhone($('fPhone').value);
+        if(!validPhone(phone)) throw new Error('Số điện thoại không hợp lệ.');
+        const {error}=await _supabase.auth.signInWithOtp({phone,options:{shouldCreateUser:false}});
+        if(error) throw error;
+        otpContext={type:'sms',phone,purpose:'recovery'};
+        $('otpSub').textContent='Mã OTP đã gửi tới '+phone+'. Nhập mã để đặt lại mật khẩu.';
+        $('otp').value=''; show('otpView');
+        toast('Đã gửi mã OTP qua SMS.');
+      }
+    });
+  });
+
+  $('resetForm').addEventListener('submit',e=>{
+    e.preventDefault();
+    busy($('resetBtn'),'Đang cập nhật...',async()=>{
+      const p1=$('newPass').value,p2=$('newPass2').value;
+      if(p1.length<6) throw new Error('Mật khẩu phải có ít nhất 6 ký tự.');
+      if(p1!==p2) throw new Error('Mật khẩu nhập lại không khớp.');
+      const {error}=await _supabase.auth.updateUser({password:p1});
+      if(error) throw error;
+      recoveryMode=false;
+      toast('Đã đổi mật khẩu thành công!');
+      const {data}=await _supabase.auth.getSession();
+      renderUser(data.session?.user??null);
+    });
+  });
+
+  $('logoutBtn').onclick=async()=>{ await _supabase.auth.signOut(); toast('Đã đăng xuất.'); };
+
+  // ====== HIỂN THỊ THEO TRẠNG THÁI ======
+  function renderUser(user){
+    currentUser=user;
+    if(!user){ show('authView'); $('authForm').reset(); $('dataList').innerHTML=''; return; }
+    if(recoveryMode){ show('resetView'); return; }
+    const name=user.user_metadata?.full_name||user.email?.split('@')[0]||user.phone||'Người dùng';
+    $('userName').textContent=name;
+    $('userContact').textContent=user.email||user.phone||'';
+    $('avatar').textContent=name.charAt(0).toUpperCase();
+    show('appView');
+    loadData();
+  }
+
+  // ====== DỮ LIỆU RIÊNG CỦA TỪNG TÀI KHOẢN ======
+  // Lọc theo user_id ở phía client + Row Level Security ở phía máy chủ (an toàn tuyệt đối)
+  async function loadData(){
+    if(!currentUser) return;
+    const list=$('dataList');
+    const {data,error}=await _supabase.from('notes').select('*')
+      .eq('user_id',currentUser.id).order('created_at',{ascending:false});
+    list.innerHTML='';
+    if(error){
+      list.innerHTML='<li class="empty">Không tải được dữ liệu. Hãy chạy đoạn SQL tạo bảng \'notes\' trên Supabase.</li>';
+      console.error(error); return;
+    }
+    $('countText').textContent=data.length+' mục';
+    if(!data.length){ list.innerHTML='<li class="empty">Bạn chưa có dữ liệu nào. Hãy thêm mục đầu tiên!</li>'; return; }
+    data.forEach(item=>{
+      const li=document.createElement('li');
+      const box=document.createElement('div'); box.className='txt'; box.textContent=item.content;
+      const t=document.createElement('span'); t.className='time'; t.textContent=new Date(item.created_at).toLocaleString('vi-VN');
+      box.appendChild(t);
+      const del=document.createElement('button'); del.textContent='🗑'; del.title='Xóa'; del.onclick=()=>deleteData(item.id);
+      li.append(box,del); list.appendChild(li);
+    });
+  }
+  async function addData(){
+    const input=$('dataInput'),text=input.value.trim();
+    if(!text) return toast('Vui lòng nhập nội dung!','error');
+    $('addBtn').disabled=true;
+    const {error}=await _supabase.from('notes').insert([{content:text,user_id:currentUser.id}]);
+    $('addBtn').disabled=false;
+    if(error) return toast('Lỗi khi gửi dữ liệu: '+error.message,'error');
+    input.value=''; toast('Đã thêm dữ liệu thành công!'); loadData();
+  }
+  async function deleteData(id){
+    if(!confirm('Bạn chắc chắn muốn xóa mục này?')) return;
+    const {error}=await _supabase.from('notes').delete().eq('id',id).eq('user_id',currentUser.id);
+    if(error) return toast('Lỗi khi xóa: '+error.message,'error');
+    toast('Đã xóa.'); loadData();
+  }
+  $('addBtn').onclick=addData;
+  $('dataInput').addEventListener('keydown',e=>{ if(e.key==='Enter') addData(); });
+
+  // ====== KHỞI ĐỘNG ======
+  _supabase.auth.onAuthStateChange((event,session)=>{
+    if(event==='PASSWORD_RECOVERY'){ recoveryMode=true; }
+    // tránh gọi API Supabase trực tiếp trong callback -> dùng setTimeout
+    setTimeout(()=>renderUser(session?.user??null),0);
+  });
+  (async()=>{
+    try{
+      const {error}=await _supabase.auth.getSession();
+      if(error) throw error;
+      setStatus(true,'Kết nối máy chủ thành công');
+    }catch(err){ setStatus(false,'Không kết nối được máy chủ'); console.error(err); }
+  })();
+  refreshAuthUI();
+
+  // ====== HẠT SÁNG BAY TRÊN NỀN ======
+  (function(){
+    const c=$('particles'),ctx=c.getContext('2d');
+    if(matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+    let W,H,P=[];
+    function size(){W=c.width=innerWidth;H=c.height=innerHeight;
+      P=Array.from({length:Math.min(70,Math.floor(W*H/22000))},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.8+.4,vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35}));}
+    addEventListener('resize',size); size();
+    (function tick(){
+      ctx.clearRect(0,0,W,H);
+      for(const p of P){
+        p.x+=p.vx;p.y+=p.vy;
+        if(p.x<0||p.x>W)p.vx*=-1; if(p.y<0||p.y>H)p.vy*=-1;
+        ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.283);ctx.fillStyle='rgba(180,255,220,.7)';ctx.fill();
+      }
+      for(let i=0;i<P.length;i++)for(let j=i+1;j<P.length;j++){
+        const dx=P[i].x-P[j].x,dy=P[i].y-P[j].y,d=dx*dx+dy*dy;
+        if(d<14000){ctx.strokeStyle='rgba(120,200,255,'+(.18*(1-d/14000))+')';ctx.beginPath();ctx.moveTo(P[i].x,P[i].y);ctx.lineTo(P[j].x,P[j].y);ctx.stroke();}
+      }
+      requestAnimationFrame(tick);
+    })();
+  })();
+</script>
+</body>
+</html>
